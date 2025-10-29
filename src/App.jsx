@@ -103,23 +103,42 @@ export default function BatteryAlertTool() {
   const triggerAlert = () => {
     setAlertTriggered(true);
     
+    // Play alert sound with better error handling
     if (audioRef.current) {
-      audioRef.current.play().catch(e => console.log('Audio play failed:', e));
+      audioRef.current.play()
+        .then(() => console.log('Sound played successfully'))
+        .catch(e => {
+          console.log('Audio play failed:', e);
+          setTimeout(() => {
+            audioRef.current.play().catch(err => console.log('Retry failed:', err));
+          }, 100);
+        });
     }
 
+    // Show browser notification
     if ('Notification' in window && Notification.permission === 'granted') {
-      new Notification('⚡ Time to Unplug!', {
+      new Notification('Time to Unplug!', {
         body: `Battery at ${targetPercentage}%! Unplug now to save your phone from faster battery death.`,
-        icon: '🔋',
-        vibrate: [200, 100, 200, 100, 200]
+        requireInteraction: true
       });
     }
 
-    setNotification(`It's time to unplug your charger! This helps save your phone from faster battery death. 🔋💚`);
+    // Set visual notification
+    setNotification(`It's time to unplug your charger! This helps save your phone from faster battery death.`);
 
+    // Trigger vibration (works on mobile only)
     if ('vibrate' in navigator) {
-      navigator.vibrate([200, 100, 200, 100, 200, 100, 200]);
+      const vibrateSuccess = navigator.vibrate([200, 100, 200, 100, 200, 100, 200]);
+      console.log(vibrateSuccess ? 'Vibration triggered' : 'Vibration failed');
+    } else {
+      console.log('Vibration not supported on this device');
     }
+
+    // Fallback: Visual shake animation
+    document.body.style.animation = 'shake 0.5s';
+    setTimeout(() => {
+      document.body.style.animation = '';
+    }, 500);
   };
 
   const startMonitoring = () => {
@@ -127,11 +146,21 @@ export default function BatteryAlertTool() {
       setNotification('Battery API not available');
       return;
     }
+    
+    // Enable audio by creating user interaction
+    if (audioRef.current) {
+      audioRef.current.play().then(() => {
+        audioRef.current.pause();
+        audioRef.current.currentTime = 0;
+        console.log('Audio initialized successfully');
+      }).catch(e => console.log('Audio initialization failed:', e));
+    }
+    
     setIsMonitoring(true);
     monitoringRef.current = true;
     setAlertTriggered(false);
     setChargingData([]);
-    setNotification(`Monitoring active! I'll alert you at ${targetPercentage}% ⚡`);
+    setNotification(`Monitoring active! I'll alert you at ${targetPercentage}%`);
   };
 
   const stopMonitoring = () => {
@@ -152,9 +181,16 @@ export default function BatteryAlertTool() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-emerald-50 via-white to-blue-50 p-4">
+      <style>{`
+        @keyframes shake {
+          0%, 100% { transform: translateX(0); }
+          25% { transform: translateX(-10px); }
+          75% { transform: translateX(10px); }
+        }
+      `}</style>
+      
       <div className="max-w-md mx-auto">
         
-        {/* Header with Hero Section */}
         <div className="text-center mb-6 pt-4">
           <div className="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-br from-green-400 to-blue-500 rounded-2xl mb-3 shadow-lg">
             <Zap className="text-white" size={32} />
@@ -165,10 +201,8 @@ export default function BatteryAlertTool() {
           <p className="text-gray-600 text-sm">Protect your battery, extend phone life</p>
         </div>
 
-        {/* Main Card */}
         <div className="bg-white rounded-3xl shadow-lg p-6 mb-4 border border-gray-100">
           
-          {/* Battery Display - Minimalist */}
           <div className="text-center mb-6">
             <div className="inline-flex items-center justify-center mb-3">
               {battery?.charging ? (
@@ -183,10 +217,9 @@ export default function BatteryAlertTool() {
             </div>
             
             <div className="text-sm text-gray-500 mb-4">
-              {battery?.charging ? '⚡ Charging' : '🔌 Not Charging'}
+              {battery?.charging ? 'Charging' : 'Not Charging'}
             </div>
             
-            {/* Simple Progress Bar */}
             <div className="w-full bg-gray-100 rounded-full h-2 overflow-hidden">
               <div 
                 className="h-full bg-gradient-to-r from-green-400 to-blue-500 transition-all duration-500 rounded-full"
@@ -195,7 +228,6 @@ export default function BatteryAlertTool() {
             </div>
           </div>
 
-          {/* Target Slider - Clean Design */}
           <div className="mb-6">
             <div className="flex items-center justify-between mb-2">
               <label className="text-sm font-semibold text-gray-700">
@@ -216,17 +248,15 @@ export default function BatteryAlertTool() {
             />
           </div>
 
-          {/* Estimated Time - Compact */}
           {isMonitoring && battery?.charging && estimatedTime !== null && (
             <div className="bg-blue-50 rounded-2xl p-3 mb-4 flex items-center gap-2">
               <Clock size={18} className="text-blue-600" />
               <span className="text-sm text-blue-800 font-medium">
-                ~{formatTime(estimatedTime)} to reach {targetPercentage}%
+                About {formatTime(estimatedTime)} to reach {targetPercentage}%
               </span>
             </div>
           )}
 
-          {/* Control Button - Single, Prominent */}
           {!isMonitoring ? (
             <button
               onClick={startMonitoring}
@@ -244,24 +274,22 @@ export default function BatteryAlertTool() {
             </button>
           )}
 
-          {/* Alert Message */}
           {alertTriggered && (
             <div className="mt-4 bg-gradient-to-r from-yellow-100 to-orange-100 border-2 border-orange-300 rounded-2xl p-4 animate-pulse">
               <div className="flex items-start gap-3">
                 <Shield className="text-orange-600 flex-shrink-0 mt-1" size={24} />
                 <div>
                   <p className="text-orange-900 font-bold mb-1">
-                    ⚡ It's time to unplug your charger!
+                    It's time to unplug your charger!
                   </p>
                   <p className="text-orange-800 text-sm">
-                    In such a way you may save your phone from faster battery death 🔋💚
+                    In such a way you may save your phone from faster battery death
                   </p>
                 </div>
               </div>
             </div>
           )}
 
-          {/* Regular Notification */}
           {notification && !alertTriggered && (
             <div className="mt-4 bg-green-50 border border-green-200 rounded-2xl p-3">
               <p className="text-sm text-green-800 text-center">
@@ -271,7 +299,6 @@ export default function BatteryAlertTool() {
           )}
         </div>
 
-        {/* Benefits Section - Engaging */}
         <div className="bg-gradient-to-br from-purple-50 to-pink-50 rounded-3xl shadow-lg p-6 border border-purple-100">
           <div className="flex items-center gap-2 mb-4">
             <Sparkles className="text-purple-600" size={24} />
@@ -296,7 +323,7 @@ export default function BatteryAlertTool() {
                 2
               </div>
               <div>
-                <p className="font-semibold text-gray-800 text-sm">Smart & Adaptive</p>
+                <p className="font-semibold text-gray-800 text-sm">Smart and Adaptive</p>
                 <p className="text-gray-600 text-xs">Learns your phone's charging speed automatically</p>
               </div>
             </div>
@@ -307,22 +334,20 @@ export default function BatteryAlertTool() {
               </div>
               <div>
                 <p className="font-semibold text-gray-800 text-sm">Never Miss the Alert</p>
-                <p className="text-gray-600 text-xs">Sound + vibration + notification = You won't forget!</p>
+                <p className="text-gray-600 text-xs">Sound plus vibration plus notification equals you will not forget</p>
               </div>
             </div>
           </div>
         </div>
 
-        {/* Footer Tagline */}
         <div className="text-center mt-6 pb-4">
           <p className="text-xs text-gray-500">
             Small habit, big impact on your phone's life
           </p>
         </div>
 
-        {/* Audio element */}
-        <audio ref={audioRef}>
-          <source src="data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2/LDciUFLIHO8tiJNwgZaLvt559NEAxQp+PwtmMcBjiR1/LMeSwFJHfH8N2QQAoUXrTp66hVFApGn+DyvmwhBSuBzvLZizcIGWi77eefTRAMUKfj8LZjHAY4ktfzzHksBSR3yPDekEAKFF+07OunVRQKRZ/g8r1sIQUsgs/z2Io3CBloue3nn00QDFC" type="audio/wav" />
+        <audio ref={audioRef} preload="auto">
+          <source src="https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3" type="audio/mpeg" />
         </audio>
       </div>
     </div>
